@@ -1,9 +1,12 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { getPatient } from '../../features/patient/patientService';
 import { useState, useEffect } from 'react';
 import { Patient } from '../../types';
+import { resetDatabase } from '../../db/database';
+import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
@@ -13,6 +16,36 @@ export default function SettingsScreen() {
   const loadPatient = async () => {
     const data = await getPatient();
     setPatient(data);
+  };
+  
+  const handleResetDatabase = () => {
+    Alert.alert(
+      'Reset Database',
+      'This will delete ALL data including your patient identity. You will need to complete onboarding again. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetDatabase();
+              Alert.alert('Success', 'Database reset complete', [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    router.replace('/onboarding');
+                  },
+                },
+              ]);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to reset database');
+              console.error(error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -48,6 +81,18 @@ export default function SettingsScreen() {
           • App preferences
         </Text>
       </View>
+
+      {__DEV__ && (
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerZoneTitle}>⚠️ Developer Tools</Text>
+          <TouchableOpacity style={styles.dangerButton} onPress={handleResetDatabase}>
+            <Text style={styles.dangerButtonText}>🗑️ Reset Database</Text>
+          </TouchableOpacity>
+          <Text style={styles.dangerHint}>
+            This will delete all data and return you to onboarding
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -97,6 +142,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     lineHeight: 24,
+  },
+  dangerZone: {
+    marginTop: 40,
+    padding: 20,
+    backgroundColor: '#fff5f5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ffcccc',
+  },
+  dangerZoneTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#d32f2f',
+    marginBottom: 12,
+  },
+  dangerButton: {
+    backgroundColor: '#d32f2f',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dangerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerHint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
 
