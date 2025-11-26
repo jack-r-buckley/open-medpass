@@ -8,9 +8,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import { Prescription, FREQUENCIES } from '../../types';
 import {
   getPrescription,
@@ -35,6 +36,9 @@ export default function EditPrescription() {
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'active' | 'completed' | 'discontinued'>('active');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Modal state for frequency picker
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
 
   useEffect(() => {
     loadPrescription();
@@ -146,6 +150,7 @@ export default function EditPrescription() {
   }
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {!editing ? (
         // View Mode
@@ -262,17 +267,14 @@ export default function EditPrescription() {
 
           <View style={styles.section}>
             <Text style={styles.label}>Frequency *</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={frequency}
-                onValueChange={setFrequency}
-                style={styles.picker}
-              >
-                {FREQUENCIES.map(freq => (
-                  <Picker.Item key={freq} label={freq} value={freq} />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowFrequencyPicker(true)}
+            >
+              <Text style={styles.pickerButtonTextSelected}>
+                {frequency}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.section}>
@@ -335,6 +337,41 @@ export default function EditPrescription() {
         </>
       )}
     </ScrollView>
+
+      {/* Frequency Picker Modal */}
+      <Modal
+        visible={showFrequencyPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFrequencyPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Frequency</Text>
+              <TouchableOpacity onPress={() => setShowFrequencyPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={FREQUENCIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setFrequency(item);
+                    setShowFrequencyPicker(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -382,14 +419,18 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
-  pickerContainer: {
+  pickerButton: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
+    padding: 12,
+    justifyContent: 'center',
+    minHeight: 50,
   },
-  picker: {
-    height: 50,
+  pickerButtonTextSelected: {
+    fontSize: 16,
+    color: '#333',
   },
   statusButtons: {
     flexDirection: 'row',
@@ -452,6 +493,44 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#99c9ff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalClose: {
+    fontSize: 24,
+    color: '#666',
+    fontWeight: '300',
+  },
+  modalItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 

@@ -1,6 +1,6 @@
 import { Prescription } from '../../types';
 import { query, execute } from '../../db/database';
-import { generateUUID, now } from '../crypto/cryptoService';
+import { generateUUID } from '../crypto/cryptoService';
 import { getPatient } from '../patient/patientService';
 import { logAudit } from '../audit/auditService';
 
@@ -87,7 +87,7 @@ export async function createPrescription(data: {
   if (!patient) throw new Error('No patient found');
 
   const prescriptionId = generateUUID();
-  const timestamp = now();
+  const timestamp = Date.now();
 
   await execute(
     `INSERT INTO prescriptions (
@@ -157,7 +157,7 @@ export async function updatePrescription(
   const existing = await getPrescription(id);
   if (!existing) throw new Error('Prescription not found');
 
-  const timestamp = now();
+  const timestamp = Date.now();
   const newVersion = existing.version + 1;
 
   await execute(
@@ -199,7 +199,7 @@ export async function deletePrescription(id: string): Promise<void> {
   const existing = await getPrescription(id);
   if (!existing) throw new Error('Prescription not found');
 
-  const timestamp = now();
+  const timestamp = Date.now();
   const newVersion = existing.version + 1;
 
   await execute(

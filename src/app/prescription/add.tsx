@@ -8,9 +8,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Picker } from '@react-native-picker/picker';
 import { SAMPLE_MEDICATIONS, FREQUENCIES } from '../../types';
 import { createPrescription } from '../../features/prescriptions/prescriptionService';
 
@@ -24,14 +25,21 @@ export default function AddPrescription() {
   const [prescriberName, setPrescriberName] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Modal states
+  const [showMedicationPicker, setShowMedicationPicker] = useState(false);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
 
-  const handleMedicationChange = (code: string) => {
+  const handleMedicationChange = (code: string, display: string, defaultDosage: string) => {
     setMedicationCode(code);
-    const med = SAMPLE_MEDICATIONS.find(m => m.code === code);
-    if (med) {
-      setMedicationDisplay(med.display);
-      setDosage(med.defaultDosage);
-    }
+    setMedicationDisplay(display);
+    setDosage(defaultDosage);
+    setShowMedicationPicker(false);
+  };
+  
+  const handleFrequencyChange = (freq: string) => {
+    setFrequency(freq);
+    setShowFrequencyPicker(false);
   };
 
   const handleSubmit = async () => {
@@ -70,61 +78,50 @@ export default function AddPrescription() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.label}>Medication *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={medicationCode}
-            onValueChange={handleMedicationChange}
-            style={styles.picker}
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.label}>Medication *</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setShowMedicationPicker(true)}
           >
-            <Picker.Item label="Select medication..." value="" />
-            {SAMPLE_MEDICATIONS.map(med => (
-              <Picker.Item
-                key={med.code}
-                label={med.display}
-                value={med.code}
-              />
-            ))}
-            <Picker.Item label="Custom medication..." value="custom" />
-          </Picker>
+            <Text style={medicationDisplay ? styles.pickerButtonTextSelected : styles.pickerButtonTextPlaceholder}>
+              {medicationDisplay || 'Select medication...'}
+            </Text>
+          </TouchableOpacity>
+
+          {medicationCode === 'custom' && (
+            <TextInput
+              style={[styles.input, { marginTop: 8 }]}
+              value={medicationDisplay}
+              onChangeText={setMedicationDisplay}
+              placeholder="Enter medication name"
+            />
+          )}
         </View>
 
-        {medicationCode === 'custom' && (
+        <View style={styles.section}>
+          <Text style={styles.label}>Dosage *</Text>
           <TextInput
             style={styles.input}
-            value={medicationDisplay}
-            onChangeText={setMedicationDisplay}
-            placeholder="Enter medication name"
+            value={dosage}
+            onChangeText={setDosage}
+            placeholder="e.g., 500mg, 2 tablets"
           />
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Dosage *</Text>
-        <TextInput
-          style={styles.input}
-          value={dosage}
-          onChangeText={setDosage}
-          placeholder="e.g., 500mg, 2 tablets"
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Frequency *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={frequency}
-            onValueChange={setFrequency}
-            style={styles.picker}
-          >
-            {FREQUENCIES.map(freq => (
-              <Picker.Item key={freq} label={freq} value={freq} />
-            ))}
-          </Picker>
         </View>
-      </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Frequency *</Text>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={() => setShowFrequencyPicker(true)}
+          >
+            <Text style={styles.pickerButtonTextSelected}>
+              {frequency}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       <View style={styles.section}>
         <Text style={styles.label}>Duration (days)</Text>
@@ -159,28 +156,91 @@ export default function AddPrescription() {
         />
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={() => router.back()}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => router.back()}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.secondaryButtonText}>Cancel</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Add Prescription</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Add Prescription</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Medication Picker Modal */}
+      <Modal
+        visible={showMedicationPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMedicationPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Medication</Text>
+              <TouchableOpacity onPress={() => setShowMedicationPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={[...SAMPLE_MEDICATIONS, { code: 'custom', display: 'Custom medication...', defaultDosage: '' }]}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => handleMedicationChange(item.code, item.display, item.defaultDosage)}
+                >
+                  <Text style={styles.modalItemText}>{item.display}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Frequency Picker Modal */}
+      <Modal
+        visible={showFrequencyPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFrequencyPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Frequency</Text>
+              <TouchableOpacity onPress={() => setShowFrequencyPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={FREQUENCIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => handleFrequencyChange(item)}
+                >
+                  <Text style={styles.modalItemText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -214,14 +274,22 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
-  pickerContainer: {
+  pickerButton: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
+    padding: 12,
+    justifyContent: 'center',
+    minHeight: 50,
   },
-  picker: {
-    height: 50,
+  pickerButtonTextSelected: {
+    fontSize: 16,
+    color: '#333',
+  },
+  pickerButtonTextPlaceholder: {
+    fontSize: 16,
+    color: '#999',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -252,6 +320,44 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#99c9ff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalClose: {
+    fontSize: 24,
+    color: '#666',
+    fontWeight: '300',
+  },
+  modalItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 
