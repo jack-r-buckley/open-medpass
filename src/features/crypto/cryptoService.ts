@@ -8,6 +8,17 @@ export function generateUUID(): string {
 }
 
 /**
+ * Generate composite IDs that are sortable by timestamp, and show which device created the record
+ */
+
+export function generateRecordId(deviceId: string, counter?: number): string {
+  const timestamp = now()
+  const randomPart = generateUUID().substring(0, 8);
+  const countPart = counter ? `-${counter}` : '';
+  return `${deviceId.substring(0, 8)}-${timestamp}-${randomPart}${countPart}`;
+}
+
+/**
  * Hash a string using SHA-256
  */
 export async function hashString(input: string): Promise<string> {
