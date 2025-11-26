@@ -12,7 +12,7 @@ export function generateUUID(): string {
  */
 
 export function generateRecordId(deviceId: string, counter?: number): string {
-  const timestamp = now()
+  const timestamp = Date.now();
   const randomPart = generateUUID().substring(0, 8);
   const countPart = counter ? `-${counter}` : '';
   return `${deviceId.substring(0, 8)}-${timestamp}-${randomPart}${countPart}`;
@@ -38,11 +38,3 @@ export function generateKeyPair(): { publicKey: string; privateKey: string } {
   const privateKey = generateUUID();
   return { publicKey, privateKey };
 }
-
-/**
- * Get current timestamp in milliseconds
- */
-export function now(): number {
-  return Date.now();
-}
-

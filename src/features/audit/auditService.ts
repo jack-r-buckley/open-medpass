@@ -1,6 +1,6 @@
 import { AuditLogEntry } from '../../types';
 import { query, execute } from '../../db/database';
-import { generateUUID, now } from '../crypto/cryptoService';
+import { generateUUID } from '../crypto/cryptoService';
 import { getPatient } from '../patient/patientService';
 
 /**
@@ -16,7 +16,7 @@ export async function logAudit(data: {
   if (!patient) return; // Silently fail if no patient (shouldn't happen)
 
   const auditId = generateUUID();
-  const timestamp = now();
+  const timestamp = Date.now();
 
   await execute(
     `INSERT INTO audit_log (

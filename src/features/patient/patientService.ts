@@ -1,6 +1,6 @@
 import { Patient } from '../../types';
-import { query, queryOne, execute } from '../../db/database';
-import { generateUUID, hashString, generateKeyPair, now } from '../crypto/cryptoService';
+import { queryOne, execute } from '../../db/database';
+import { generateUUID, hashString, generateKeyPair } from '../crypto/cryptoService';
 
 /**
  * Check if a patient exists in the database
@@ -55,7 +55,7 @@ export async function createPatient(data: {
   const pinHash = await hashString(data.pin);
   const recoveryAnswerHash = await hashString(data.recoveryAnswer.toLowerCase().trim());
   
-  const timestamp = now();
+  const timestamp = Date.now();
   
   // Insert into database
   await execute(
