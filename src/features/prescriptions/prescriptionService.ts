@@ -1,6 +1,6 @@
 import { Prescription } from '../../types';
 import { query, execute } from '../../db/database';
-import { generateUUID, now } from '../../utils/crypto';
+import { generateUUID, now } from '../crypto/cryptoService';
 import { getPatient } from '../patient/patientService';
 import { logAudit } from '../audit/auditService';
 

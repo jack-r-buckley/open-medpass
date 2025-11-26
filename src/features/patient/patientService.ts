@@ -1,6 +1,6 @@
 import { Patient } from '../../types';
 import { query, queryOne, execute } from '../../db/database';
-import { generateUUID, hashString, generateKeyPair, now } from '../../utils/crypto';
+import { generateUUID, hashString, generateKeyPair, now } from '../crypto/cryptoService';
 
 /**
  * Check if a patient exists in the database
