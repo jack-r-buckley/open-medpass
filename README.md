@@ -13,8 +13,9 @@ See [docs/mission-statement.md](docs/mission-statement.md) for full background a
 ### ✅ Phase 0: Foundation & Identity
 - Patient onboarding with PIN protection
 - Device registration with UUID generation
-- SQLite database initialization
+- SQLite database with Drizzle ORM
 - Recovery question system
+- **Persistent storage** - data survives app restarts!
 
 ### ✅ Phase 1: Prescription Management
 - CRUD operations for prescriptions
@@ -22,6 +23,7 @@ See [docs/mission-statement.md](docs/mission-statement.md) for full background a
 - Audit trail logging
 - Version vectors for future sync
 - Status tracking (active/completed/discontinued)
+- Type-safe queries with Drizzle
 
 ### 🚧 In Progress
 - Phase 2: Sync foundation with MockTransport
@@ -30,9 +32,9 @@ See [docs/mission-statement.md](docs/mission-statement.md) for full background a
 
 ## Tech Stack
 
-- **Framework**: React Native with Expo (Development Builds)
+- **Framework**: React Native with Expo
 - **Navigation**: Expo Router (file-based)
-- **Database**: SQLite (expo-sqlite)
+- **Database**: expo-sqlite + Drizzle ORM
 - **Crypto**: expo-crypto
 - **Language**: TypeScript
 
@@ -42,8 +44,7 @@ See [docs/mission-statement.md](docs/mission-statement.md) for full background a
 
 - Node.js 18+
 - npm or yarn
-- Expo CLI
-- iOS Simulator (Mac) or Android Emulator
+- Expo Go app on your phone (or iOS Simulator/Android Emulator)
 
 ### Installation
 
@@ -51,18 +52,16 @@ See [docs/mission-statement.md](docs/mission-statement.md) for full background a
 # Install dependencies
 npm install
 
-# Start development server
+# Start Expo
 npm start
 
-# Run on iOS
-npm run ios
-
-# Run on Android
-npm run android
-
-# Run on web (limited functionality)
-npm run web
+# Then press:
+# - 'i' for iOS Simulator
+# - 'a' for Android Emulator
+# - Scan QR code with Expo Go for physical device
 ```
+
+**No native builds required!** Works in Expo Go. 🎉
 
 ### First Run
 

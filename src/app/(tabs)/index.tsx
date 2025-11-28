@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,18 +10,32 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Prescription } from '../../types';
+import { Prescription } from '../../db/schema';
 import { getPrescriptions } from '../../features/prescriptions/prescriptionService';
+import { getPatient } from '../../features/patient/patientService';
 
 export default function RecordsScreen() {
   const router = useRouter();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [patientId, setPatientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadPatient() {
+      const patient = await getPatient();
+      if (patient) {
+        setPatientId(patient.id);
+      }
+    }
+    loadPatient();
+  }, []);
 
   const loadPrescriptions = async () => {
+    if (!patientId) return;
+    
     try {
-      const data = await getPrescriptions();
+      const data = await getPrescriptions(patientId);
       setPrescriptions(data);
     } catch (error) {
       console.error('Failed to load prescriptions:', error);
@@ -34,8 +48,10 @@ export default function RecordsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadPrescriptions();
-    }, [])
+      if (patientId) {
+        loadPrescriptions();
+      }
+    }, [patientId])
   );
 
   const onRefresh = () => {
@@ -43,8 +59,8 @@ export default function RecordsScreen() {
     loadPrescriptions();
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString();
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString();
   };
 
   const getStatusColor = (status: string) => {
@@ -66,7 +82,7 @@ export default function RecordsScreen() {
       onPress={() => router.push(`/prescription/${item.id}`)}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.medicationName}>{item.medicationDisplay}</Text>
+        <Text style={styles.medicationName}>{item.medication}</Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{item.status}</Text>
         </View>
@@ -76,20 +92,20 @@ export default function RecordsScreen() {
         {item.dosage} • {item.frequency}
       </Text>
       
-      {item.durationDays && (
+      {item.duration_days && (
         <Text style={styles.durationText}>
-          Duration: {item.durationDays} days
+          Duration: {item.duration_days} days
         </Text>
       )}
       
-      {item.prescriberName && (
+      {item.prescriber_name && (
         <Text style={styles.prescriberText}>
-          Prescribed by: {item.prescriberName}
+          Prescribed by: {item.prescriber_name}
         </Text>
       )}
       
       <Text style={styles.dateText}>
-        Added: {formatDate(item.createdAt)}
+        Added: {formatDate(new Date(item.created_at))}
       </Text>
     </TouchableOpacity>
   );

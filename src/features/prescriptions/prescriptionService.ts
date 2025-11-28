@@ -1,220 +1,128 @@
-import { Prescription } from '../../types';
-import { query, execute } from '../../db/database';
-import { generateUUID } from '../crypto/cryptoService';
-import { getPatient } from '../patient/patientService';
-import { logAudit } from '../audit/auditService';
+import { eq, desc } from 'drizzle-orm';
+import { db } from '../../db';
+import { prescriptions, type Prescription, type NewPrescription } from '../../db/schema';
+import { generateRecordId } from '../crypto/cryptoService';
+import { addAuditLogEntry } from '../audit/auditService';
 
-/**
- * Get all active prescriptions for the current patient
- */
-export async function getPrescriptions(): Promise<Prescription[]> {
-  const patient = await getPatient();
-  if (!patient) throw new Error('No patient found');
-
-  const rows = await query<any>(
-    `SELECT * FROM prescriptions 
-     WHERE patient_id = ? AND is_deleted = 0 
-     ORDER BY created_at DESC`,
-    [patient.id]
-  );
-
-  return rows.map(row => ({
-    id: row.id,
-    patientId: row.patient_id,
-    medicationCode: row.medication_code,
-    medicationDisplay: row.medication_display,
-    dosage: row.dosage,
-    frequency: row.frequency,
-    durationDays: row.duration_days,
-    prescriberName: row.prescriber_name,
-    prescriberId: row.prescriber_id,
-    notes: row.notes,
-    status: row.status,
-    deviceId: row.device_id,
-    version: row.version,
-    createdAt: row.created_at,
-    lastModified: row.last_modified,
-    isDeleted: row.is_deleted === 1,
-  }));
+export interface CreatePrescriptionInput {
+  patientId: string;
+  medication: string;
+  dosage: string;
+  frequency: string;
+  durationDays: number;
+  prescriberName: string;
+  prescriberFacility: string;
+  startDate: Date;
+  notes?: string;
 }
 
-/**
- * Get a single prescription by ID
- */
-export async function getPrescription(id: string): Promise<Prescription | null> {
-  const rows = await query<any>(
-    'SELECT * FROM prescriptions WHERE id = ?',
-    [id]
-  );
-
-  if (rows.length === 0) return null;
-
-  const row = rows[0];
-  return {
-    id: row.id,
-    patientId: row.patient_id,
-    medicationCode: row.medication_code,
-    medicationDisplay: row.medication_display,
-    dosage: row.dosage,
-    frequency: row.frequency,
-    durationDays: row.duration_days,
-    prescriberName: row.prescriber_name,
-    prescriberId: row.prescriber_id,
-    notes: row.notes,
-    status: row.status,
-    deviceId: row.device_id,
-    version: row.version,
-    createdAt: row.created_at,
-    lastModified: row.last_modified,
-    isDeleted: row.is_deleted === 1,
-  };
+export interface UpdatePrescriptionInput {
+  medication?: string;
+  dosage?: string;
+  frequency?: string;
+  durationDays?: number;
+  prescriberName?: string;
+  prescriberFacility?: string;
+  startDate?: Date;
+  notes?: string;
+  status?: 'active' | 'completed' | 'discontinued';
 }
 
 /**
  * Create a new prescription
  */
-export async function createPrescription(data: {
-  medicationCode?: string;
-  medicationDisplay: string;
-  dosage: string;
-  frequency: string;
-  durationDays?: number;
-  prescriberName?: string;
-  prescriberId?: string;
-  notes?: string;
-}): Promise<Prescription> {
-  const patient = await getPatient();
-  if (!patient) throw new Error('No patient found');
+export async function createPrescription(input: CreatePrescriptionInput): Promise<Prescription> {
+  const prescriptionId = await generateRecordId('prescription');
+  const deviceId = await generateRecordId('device');
 
-  const prescriptionId = generateUUID();
-  const timestamp = Date.now();
+  const prescriptionData: NewPrescription = {
+    id: prescriptionId,
+    patient_id: input.patientId,
+    medication: input.medication,
+    dosage: input.dosage,
+    frequency: input.frequency,
+    duration_days: input.durationDays,
+    prescriber_name: input.prescriberName,
+    prescriber_facility: input.prescriberFacility,
+    start_date: input.startDate.toISOString(),
+    notes: input.notes,
+    status: 'active',
+    device_id: deviceId,
+    version_vector: JSON.stringify({ [deviceId]: 1 }),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
-  await execute(
-    `INSERT INTO prescriptions (
-      id, patient_id, medication_code, medication_display,
-      dosage, frequency, duration_days, prescriber_name,
-      prescriber_id, notes, status, device_id, version,
-      created_at, last_modified, is_deleted
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      prescriptionId,
-      patient.id,
-      data.medicationCode || null,
-      data.medicationDisplay,
-      data.dosage,
-      data.frequency,
-      data.durationDays || null,
-      data.prescriberName || null,
-      data.prescriberId || null,
-      data.notes || null,
-      'active',
-      patient.deviceId,
-      1,
-      timestamp,
-      timestamp,
-      0,
-    ]
-  );
+  const result = await db.insert(prescriptions).values(prescriptionData).returning();
 
-  // Log audit trail
-  await logAudit({
-    action: 'create',
+  await addAuditLogEntry({
     recordType: 'prescription',
     recordId: prescriptionId,
-    changes: JSON.stringify(data),
+    action: 'create',
   });
 
-  return {
-    id: prescriptionId,
-    patientId: patient.id,
-    medicationCode: data.medicationCode,
-    medicationDisplay: data.medicationDisplay,
-    dosage: data.dosage,
-    frequency: data.frequency,
-    durationDays: data.durationDays,
-    prescriberName: data.prescriberName,
-    prescriberId: data.prescriberId,
-    notes: data.notes,
-    status: 'active',
-    deviceId: patient.deviceId,
-    version: 1,
-    createdAt: timestamp,
-    lastModified: timestamp,
-    isDeleted: false,
-  };
+  console.log('✅ Prescription created:', result[0].id);
+  return result[0];
 }
 
 /**
- * Update an existing prescription
+ * Get a specific prescription by ID
+ */
+export async function getPrescription(id: string): Promise<Prescription | null> {
+  const result = await db.select().from(prescriptions).where(eq(prescriptions.id, id)).limit(1);
+  return result[0] || null;
+}
+
+/**
+ * Get all prescriptions for a patient
+ */
+export async function getPrescriptions(patientId: string): Promise<Prescription[]> {
+  return await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.patient_id, patientId))
+    .orderBy(desc(prescriptions.created_at));
+}
+
+/**
+ * Update a prescription
  */
 export async function updatePrescription(
   id: string,
-  data: Partial<Prescription>
-): Promise<void> {
-  const patient = await getPatient();
-  if (!patient) throw new Error('No patient found');
+  updates: UpdatePrescriptionInput
+): Promise<Prescription | null> {
+  const updateData: Partial<Prescription> = {
+    updated_at: new Date().toISOString(),
+  };
 
-  const existing = await getPrescription(id);
-  if (!existing) throw new Error('Prescription not found');
+  if (updates.medication !== undefined) updateData.medication = updates.medication;
+  if (updates.dosage !== undefined) updateData.dosage = updates.dosage;
+  if (updates.frequency !== undefined) updateData.frequency = updates.frequency;
+  if (updates.durationDays !== undefined) updateData.duration_days = updates.durationDays;
+  if (updates.prescriberName !== undefined) updateData.prescriber_name = updates.prescriberName;
+  if (updates.prescriberFacility !== undefined) updateData.prescriber_facility = updates.prescriberFacility;
+  if (updates.startDate !== undefined) updateData.start_date = updates.startDate.toISOString();
+  if (updates.notes !== undefined) updateData.notes = updates.notes;
+  if (updates.status !== undefined) updateData.status = updates.status;
 
-  const timestamp = Date.now();
-  const newVersion = existing.version + 1;
+  const result = await db
+    .update(prescriptions)
+    .set(updateData)
+    .where(eq(prescriptions.id, id))
+    .returning();
 
-  await execute(
-    `UPDATE prescriptions 
-     SET medication_code = ?, medication_display = ?, dosage = ?,
-         frequency = ?, duration_days = ?, prescriber_name = ?,
-         prescriber_id = ?, notes = ?, status = ?,
-         version = ?, last_modified = ?
-     WHERE id = ?`,
-    [
-      data.medicationCode ?? existing.medicationCode ?? null,
-      data.medicationDisplay ?? existing.medicationDisplay,
-      data.dosage ?? existing.dosage,
-      data.frequency ?? existing.frequency,
-      data.durationDays ?? existing.durationDays ?? null,
-      data.prescriberName ?? existing.prescriberName ?? null,
-      data.prescriberId ?? existing.prescriberId ?? null,
-      data.notes ?? existing.notes ?? null,
-      data.status ?? existing.status,
-      newVersion,
-      timestamp,
-      id,
-    ]
-  );
+  if (result[0]) {
+    await addAuditLogEntry({
+      recordType: 'prescription',
+      recordId: id,
+      action: 'update',
+      changes: JSON.stringify(updates),
+    });
 
-  // Log audit trail
-  await logAudit({
-    action: 'update',
-    recordType: 'prescription',
-    recordId: id,
-    changes: JSON.stringify(data),
-  });
-}
+    console.log('✅ Prescription updated:', id);
+  }
 
-/**
- * Soft delete a prescription
- */
-export async function deletePrescription(id: string): Promise<void> {
-  const existing = await getPrescription(id);
-  if (!existing) throw new Error('Prescription not found');
-
-  const timestamp = Date.now();
-  const newVersion = existing.version + 1;
-
-  await execute(
-    `UPDATE prescriptions 
-     SET is_deleted = 1, version = ?, last_modified = ?
-     WHERE id = ?`,
-    [newVersion, timestamp, id]
-  );
-
-  // Log audit trail
-  await logAudit({
-    action: 'delete',
-    recordType: 'prescription',
-    recordId: id,
-  });
+  return result[0] || null;
 }
 
 /**
@@ -223,7 +131,26 @@ export async function deletePrescription(id: string): Promise<void> {
 export async function updatePrescriptionStatus(
   id: string,
   status: 'active' | 'completed' | 'discontinued'
-): Promise<void> {
-  await updatePrescription(id, { status });
+): Promise<Prescription | null> {
+  return updatePrescription(id, { status });
 }
 
+/**
+ * Delete a prescription
+ */
+export async function deletePrescription(id: string): Promise<boolean> {
+  const result = await db.delete(prescriptions).where(eq(prescriptions.id, id)).returning();
+
+  if (result[0]) {
+    await addAuditLogEntry({
+      recordType: 'prescription',
+      recordId: id,
+      action: 'delete',
+    });
+
+    console.log('✅ Prescription deleted:', id);
+    return true;
+  }
+
+  return false;
+}

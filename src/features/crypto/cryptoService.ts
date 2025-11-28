@@ -30,6 +30,13 @@ export async function hashString(input: string): Promise<string> {
 }
 
 /**
+ * Hash a PIN (alias for hashString for better readability)
+ */
+export async function hashPin(pin: string): Promise<string> {
+  return hashString(pin);
+}
+
+/**
  * Generate a simple key pair (for POC - not production grade)
  * In production, we'd use proper asymmetric crypto
  */
@@ -37,4 +44,11 @@ export function generateKeyPair(): { publicKey: string; privateKey: string } {
   const publicKey = generateUUID();
   const privateKey = generateUUID();
   return { publicKey, privateKey };
+}
+
+/**
+ * Get current timestamp in milliseconds
+ */
+export function now(): number {
+  return Date.now();
 }

@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { getPatient } from '../../features/patient/patientService';
 import { useState, useEffect } from 'react';
-import { Patient } from '../../types';
-import { resetDatabase } from '../../db/database';
+import { Patient } from '../../db/schema';
+import { resetDatabase } from '../../db';
 import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
@@ -59,15 +59,19 @@ export default function SettingsScreen() {
             <Text style={styles.label}>Name:</Text>
             <Text style={styles.value}>{patient.name}</Text>
           </View>
-          {patient.nationalId && (
+          {patient.national_id && (
             <View style={styles.infoRow}>
               <Text style={styles.label}>National ID:</Text>
-              <Text style={styles.value}>{patient.nationalId}</Text>
+              <Text style={styles.value}>{patient.national_id}</Text>
             </View>
           )}
           <View style={styles.infoRow}>
             <Text style={styles.label}>Device ID:</Text>
-            <Text style={styles.value}>{patient.deviceId.substring(0, 8)}...</Text>
+            <Text style={styles.value}>{patient.device_id.substring(0, 8)}...</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Patient ID:</Text>
+            <Text style={styles.value}>{patient.id.substring(0, 8)}...</Text>
           </View>
         </View>
       )}

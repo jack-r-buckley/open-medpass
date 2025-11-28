@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { initDatabase } from '../db/database';
+import { initDatabase } from '../db';
 import { hasPatient } from '../features/patient/patientService';
 
 export default function Index() {

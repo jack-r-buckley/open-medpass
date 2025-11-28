@@ -12,7 +12,8 @@ import {
   FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Prescription, FREQUENCIES } from '../../types';
+import { Prescription } from '../../db/schema';
+import { FREQUENCIES } from '../../types';
 import {
   getPrescription,
   updatePrescription,
@@ -28,7 +29,7 @@ export default function EditPrescription() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   
-  const [medicationDisplay, setMedicationDisplay] = useState('');
+  const [medication, setMedication] = useState('');
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState(FREQUENCIES[0]);
   const [durationDays, setDurationDays] = useState('');
@@ -49,11 +50,11 @@ export default function EditPrescription() {
       const data = await getPrescription(id);
       if (data) {
         setPrescription(data);
-        setMedicationDisplay(data.medicationDisplay);
+        setMedication(data.medication);
         setDosage(data.dosage);
         setFrequency(data.frequency);
-        setDurationDays(data.durationDays?.toString() || '');
-        setPrescriberName(data.prescriberName || '');
+        setDurationDays(data.duration_days?.toString() || '');
+        setPrescriberName(data.prescriber_name || '');
         setNotes(data.notes || '');
         setStatus(data.status);
       }
@@ -66,7 +67,7 @@ export default function EditPrescription() {
   };
 
   const handleUpdate = async () => {
-    if (!medicationDisplay.trim() || !dosage.trim()) {
+    if (!medication.trim() || !dosage.trim()) {
       Alert.alert('Error', 'Please fill in required fields');
       return;
     }
@@ -75,7 +76,7 @@ export default function EditPrescription() {
 
     try {
       await updatePrescription(id, {
-        medicationDisplay: medicationDisplay.trim(),
+        medication: medication.trim(),
         dosage: dosage.trim(),
         frequency,
         durationDays: durationDays ? parseInt(durationDays) : undefined,
@@ -129,8 +130,8 @@ export default function EditPrescription() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString();
+  const formatDate = (date: Date) => {
+    return date.toLocaleString();
   };
 
   if (loading) {
@@ -157,7 +158,7 @@ export default function EditPrescription() {
         <>
           <View style={styles.section}>
             <Text style={styles.label}>Medication</Text>
-            <Text style={styles.value}>{prescription.medicationDisplay}</Text>
+            <Text style={styles.value}>{prescription.medication}</Text>
           </View>
 
           <View style={styles.section}>
@@ -170,17 +171,17 @@ export default function EditPrescription() {
             <Text style={styles.value}>{prescription.frequency}</Text>
           </View>
 
-          {prescription.durationDays && (
+          {prescription.duration_days && (
             <View style={styles.section}>
               <Text style={styles.label}>Duration</Text>
-              <Text style={styles.value}>{prescription.durationDays} days</Text>
+              <Text style={styles.value}>{prescription.duration_days} days</Text>
             </View>
           )}
 
-          {prescription.prescriberName && (
+          {prescription.prescriber_name && (
             <View style={styles.section}>
               <Text style={styles.label}>Prescribed by</Text>
-              <Text style={styles.value}>{prescription.prescriberName}</Text>
+              <Text style={styles.value}>{prescription.prescriber_name}</Text>
             </View>
           )}
 
@@ -218,12 +219,12 @@ export default function EditPrescription() {
 
           <View style={styles.section}>
             <Text style={styles.label}>Created</Text>
-            <Text style={styles.metadata}>{formatDate(prescription.createdAt)}</Text>
+            <Text style={styles.metadata}>{formatDate(new Date(prescription.created_at))}</Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.label}>Last Modified</Text>
-            <Text style={styles.metadata}>{formatDate(prescription.lastModified)}</Text>
+            <Text style={styles.metadata}>{formatDate(new Date(prescription.updated_at))}</Text>
           </View>
 
           <View style={styles.buttonContainer}>
@@ -249,8 +250,8 @@ export default function EditPrescription() {
             <Text style={styles.label}>Medication *</Text>
             <TextInput
               style={styles.input}
-              value={medicationDisplay}
-              onChangeText={setMedicationDisplay}
+              value={medication}
+              onChangeText={setMedication}
               placeholder="Medication name"
             />
           </View>

@@ -1,116 +1,105 @@
-import { Patient } from '../../types';
-import { queryOne, execute } from '../../db/database';
-import { generateUUID, hashString, generateKeyPair } from '../crypto/cryptoService';
+import { eq } from 'drizzle-orm';
+import { db } from '../../db';
+import { patients, type Patient, type NewPatient } from '../../db/schema';
+import { generateRecordId, hashPin } from '../crypto/cryptoService';
 
-/**
- * Check if a patient exists in the database
- */
-export async function hasPatient(): Promise<boolean> {
-  const result = await queryOne<{ count: number }>(
-    'SELECT COUNT(*) as count FROM patient'
-  );
-  return (result?.count ?? 0) > 0;
-}
-
-/**
- * Get the current patient
- */
-export async function getPatient(): Promise<Patient | null> {
-  const row = await queryOne<any>(
-    'SELECT * FROM patient LIMIT 1'
-  );
-  
-  if (!row) return null;
-  
-  return {
-    id: row.id,
-    deviceId: row.device_id,
-    publicKey: row.public_key,
-    name: row.name,
-    nationalId: row.national_id,
-    pinHash: row.pin_hash,
-    recoveryQuestion: row.recovery_question,
-    recoveryAnswerHash: row.recovery_answer_hash,
-    createdAt: row.created_at,
-    lastModified: row.last_modified,
-  };
-}
-
-/**
- * Create a new patient
- */
-export async function createPatient(data: {
+export interface CreatePatientInput {
   name: string;
   nationalId?: string;
   pin: string;
   recoveryQuestion: string;
   recoveryAnswer: string;
-}): Promise<Patient> {
-  // Generate IDs and keys
-  const patientId = generateUUID();
-  const deviceId = generateUUID();
-  const { publicKey } = generateKeyPair();
-  
-  // Hash sensitive data
-  const pinHash = await hashString(data.pin);
-  const recoveryAnswerHash = await hashString(data.recoveryAnswer.toLowerCase().trim());
-  
-  const timestamp = Date.now();
-  
-  // Insert into database
-  await execute(
-    `INSERT INTO patient (
-      id, device_id, public_key, name, national_id, 
-      pin_hash, recovery_question, recovery_answer_hash,
-      created_at, last_modified
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      patientId,
-      deviceId,
-      publicKey,
-      data.name,
-      data.nationalId || null,
-      pinHash,
-      data.recoveryQuestion,
-      recoveryAnswerHash,
-      timestamp,
-      timestamp,
-    ]
-  );
-  
-  return {
-    id: patientId,
-    deviceId,
-    publicKey,
-    name: data.name,
-    nationalId: data.nationalId,
-    pinHash,
-    recoveryQuestion: data.recoveryQuestion,
-    recoveryAnswerHash,
-    createdAt: timestamp,
-    lastModified: timestamp,
-  };
 }
 
 /**
- * Verify a PIN
+ * Create a new patient record
+ */
+export async function createPatient(input: CreatePatientInput): Promise<Patient> {
+  const deviceId = await generateRecordId('patient');
+  
+  const patientData: NewPatient = {
+    id: deviceId,
+    name: input.name,
+    national_id: input.nationalId,
+    pin_hash: await hashPin(input.pin),
+    recovery_question: input.recoveryQuestion,
+    recovery_answer_hash: await hashPin(input.recoveryAnswer.toLowerCase().trim()),
+    device_id: deviceId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const result = await db.insert(patients).values(patientData).returning();
+  
+  console.log('✅ Patient created:', result[0].id);
+  return result[0];
+}
+
+/**
+ * Get the patient record (should only be one)
+ */
+export async function getPatient(): Promise<Patient | null> {
+  const result = await db.select().from(patients).limit(1);
+  return result[0] || null;
+}
+
+/**
+ * Check if a patient exists
+ */
+export async function hasPatient(): Promise<boolean> {
+  const patient = await getPatient();
+  return patient !== null;
+}
+
+/**
+ * Verify PIN
  */
 export async function verifyPin(pin: string): Promise<boolean> {
   const patient = await getPatient();
-  if (!patient) return false;
-  
-  const pinHash = await hashString(pin);
-  return pinHash === patient.pinHash;
+  if (!patient) {
+    return false;
+  }
+
+  const pinHash = await hashPin(pin);
+  return pinHash === patient.pin_hash;
 }
 
 /**
- * Verify a recovery answer
+ * Update patient PIN
+ */
+export async function updatePatientPin(oldPin: string, newPin: string): Promise<boolean> {
+  const isValid = await verifyPin(oldPin);
+  if (!isValid) {
+    return false;
+  }
+
+  const patient = await getPatient();
+  if (!patient) {
+    return false;
+  }
+
+  const newPinHash = await hashPin(newPin);
+  await db
+    .update(patients)
+    .set({
+      pin_hash: newPinHash,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(patients.id, patient.id));
+
+  console.log('✅ PIN updated');
+  return true;
+}
+
+/**
+ * Verify recovery answer
  */
 export async function verifyRecoveryAnswer(answer: string): Promise<boolean> {
   const patient = await getPatient();
-  if (!patient) return false;
-  
-  const answerHash = await hashString(answer.toLowerCase().trim());
-  return answerHash === patient.recoveryAnswerHash;
-}
+  if (!patient) {
+    return false;
+  }
 
+  const answerHash = await hashPin(answer.toLowerCase().trim());
+  return answerHash === patient.recovery_answer_hash;
+}

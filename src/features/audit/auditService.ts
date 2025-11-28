@@ -1,80 +1,43 @@
-import { AuditLogEntry } from '../../types';
-import { query, execute } from '../../db/database';
-import { generateUUID } from '../crypto/cryptoService';
-import { getPatient } from '../patient/patientService';
+import { eq, desc, and } from 'drizzle-orm';
+import { db } from '../../db';
+import { audit_logs, type AuditLog, type NewAuditLog } from '../../db/schema';
+import { generateRecordId } from '../crypto/cryptoService';
 
-/**
- * Log an audit entry
- */
-export async function logAudit(data: {
-  action: 'create' | 'update' | 'delete' | 'sync' | 'restore';
-  recordType: 'patient' | 'prescription' | 'consultation' | 'investigation';
+export interface AuditLogInput {
+  recordType: string;
   recordId: string;
+  action: 'create' | 'update' | 'delete';
   changes?: string;
-}): Promise<void> {
-  const patient = await getPatient();
-  if (!patient) return; // Silently fail if no patient (shouldn't happen)
-
-  const auditId = generateUUID();
-  const timestamp = Date.now();
-
-  await execute(
-    `INSERT INTO audit_log (
-      id, timestamp, device_id, action, record_type, record_id, changes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      auditId,
-      timestamp,
-      patient.deviceId,
-      data.action,
-      data.recordType,
-      data.recordId,
-      data.changes || null,
-    ]
-  );
 }
 
 /**
- * Get audit log entries for a specific record
+ * Add an audit log entry
  */
-export async function getAuditLog(
-  recordType: string,
-  recordId: string
-): Promise<AuditLogEntry[]> {
-  const rows = await query<any>(
-    `SELECT * FROM audit_log 
-     WHERE record_type = ? AND record_id = ?
-     ORDER BY timestamp DESC`,
-    [recordType, recordId]
-  );
+export async function addAuditLogEntry(input: AuditLogInput): Promise<AuditLog> {
+  const auditId = await generateRecordId('audit');
+  const deviceId = await generateRecordId('device');
 
-  return rows.map(row => ({
-    id: row.id,
-    timestamp: row.timestamp,
-    deviceId: row.device_id,
-    action: row.action,
-    recordType: row.record_type,
-    recordId: row.record_id,
-    changes: row.changes,
-  }));
+  const auditData: NewAuditLog = {
+    id: auditId,
+    record_type: input.recordType,
+    record_id: input.recordId,
+    action: input.action,
+    changes: input.changes,
+    device_id: deviceId,
+    timestamp: new Date().toISOString(),
+  };
+
+  const result = await db.insert(audit_logs).values(auditData).returning();
+  return result[0];
 }
 
 /**
- * Get all audit log entries
+ * Get audit logs for a specific record
  */
-export async function getAllAuditLogs(): Promise<AuditLogEntry[]> {
-  const rows = await query<any>(
-    'SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 100'
-  );
-
-  return rows.map(row => ({
-    id: row.id,
-    timestamp: row.timestamp,
-    deviceId: row.device_id,
-    action: row.action,
-    recordType: row.record_type,
-    recordId: row.record_id,
-    changes: row.changes,
-  }));
+export async function getAuditLogs(recordType: string, recordId: string): Promise<AuditLog[]> {
+  return await db
+    .select()
+    .from(audit_logs)
+    .where(and(eq(audit_logs.record_type, recordType), eq(audit_logs.record_id, recordId)))
+    .orderBy(desc(audit_logs.timestamp));
 }
-
